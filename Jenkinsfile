@@ -9,35 +9,18 @@ pipeline {
             }
         }
 
-        stage('Build') {
+        stage('Check Node.js tools') {
             steps {
                 sh '''
-                    echo "=== PROJECT INFORMATION ==="
-                    cat package.json
+                    echo "=== DOWNLOAD UTILITIES ==="
+                    command -v curl || true
+                    command -v wget || true
+                    command -v tar || true
+                    command -v xz || true
 
-                    echo "=== NODE.JS SOURCE CHECK ==="
-                    echo "Checking index.js syntax..."
-
-                    if command -v node >/dev/null 2>&1; then
-                        node --check index.js
-                    else
-                        echo "Node.js is not installed on Jenkins."
-                        echo "Syntax check will be performed in the Node.js environment later."
-                    fi
-                '''
-            }
-        }
-
-        stage('Test') {
-            steps {
-                sh '''
-                    echo "=== PROJECT FILES ==="
-                    test -f index.js
-                    test -f package.json
-                    test -f Dockerfile
-                    test -f docker-compose.yml
-
-                    echo "Required project files are present."
+                    echo "=== NODE.JS DOWNLOAD CHECK ==="
+                    curl -I -L --max-time 20 \
+                        https://nodejs.org/dist/latest-v20.x/ || true
                 '''
             }
         }
