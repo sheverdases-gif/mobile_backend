@@ -88,5 +88,65 @@ pipeline {
                 '''
             }
         }
+
+        stage('Deploy') {
+            agent {
+                label 'mobile-backend'
+            }
+
+            steps {
+                checkout scm
+
+                powershell '''
+                    $ErrorActionPreference = "Stop"
+
+                    Write-Host "=== DEPLOY MOBILE BACKEND ==="
+
+                    Set-Location $env:WORKSPACE
+
+                    $envFile = "C:\\docker_labs_new\\mobile_backend\\.env"
+
+                    if (-not (Test-Path $envFile)) {
+                        throw "Local .env file was not found."
+                    }
+
+                    Write-Host "=== BUILD AND UPDATE APP ==="
+
+                    docker compose -p mobile_backend --env-file $envFile up -d --build --no-deps app
+
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "Docker Compose deployment failed."
+                    }
+
+                    Write-Host "=== CHECK API HEALTH ==="
+
+                    $healthy = $false
+
+                    for ($i = 1; $i -le 10; $i++) {
+                        try {
+                            $response = Invoke-RestMethod `
+                                -Uri "http://localhost:8083/api/health" `
+                                -TimeoutSec 5
+
+                            if ($response.status -eq "OK") {
+                                Write-Host "API health check passed."
+                                $response | ConvertTo-Json
+                                $healthy = $true
+                                break
+                            }
+                        }
+                        catch {
+                            Write-Host "Waiting for API... attempt $i"
+                        }
+
+                        Start-Sleep -Seconds 3
+                    }
+
+                    if (-not $healthy) {
+                        throw "API health check failed after deployment."
+                    }
+                '''
+            }
+        }
     }
 }
