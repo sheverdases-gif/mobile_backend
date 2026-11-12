@@ -78,6 +78,49 @@ pipeline {
             }
         }
 
+        stage('Mobile Build') {
+            agent {
+                label 'mobile-backend'
+            }
+
+            steps {
+                checkout scm
+
+                powershell '''
+                    $ErrorActionPreference = "Stop"
+
+                    Set-Location "$env:WORKSPACE\\mobile-client"
+
+                    Write-Host "=== NODE VERSION ==="
+                    node --version
+                    npm.cmd --version
+
+                    Write-Host "=== INSTALL MOBILE DEPENDENCIES ==="
+                    npm.cmd ci
+
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "Mobile dependencies installation failed."
+                    }
+
+                    Write-Host "=== ANDROID BUNDLE BUILD ==="
+                    npx.cmd expo export --platform android
+
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "Android bundle build failed."
+                    }
+
+                    if (-not (Test-Path "dist\\metadata.json")) {
+                        throw "Expo build metadata was not generated."
+                    }
+
+                    Write-Host "Android mobile build completed successfully."
+                '''
+
+                archiveArtifacts artifacts: 'mobile-client/dist/**', fingerprint: true
+            }
+        }
+
+
         stage('Deploy') {
             agent {
                 label 'mobile-backend'
